@@ -5,15 +5,15 @@ require 'money'
 
 class InvalidCache < StandardError ; end
 
-class EuCentralBank < Money::Bank::VariableExchange
+class OfflineBank < Money::Bank::VariableExchange
 
   attr_accessor :last_updated
   attr_accessor :rates_updated_at
 
-  ECB_RATES_URL = 'http://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml'
+  CACHED_RATES = File.join ['.', 'lib', 'offline_rates']
   CURRENCIES = %w(USD JPY BGN CZK DKK GBP HUF ILS LTL PLN RON SEK CHF NOK HRK RUB TRY AUD BRL CAD CNY HKD IDR INR KRW MXN MYR NZD PHP SGD THB ZAR)
 
-  def update_rates(cache=nil)
+  def update_rates(cache=CACHED_RATES)
     update_parsed_rates(doc(cache))
   end
 
@@ -30,7 +30,7 @@ class EuCentralBank < Money::Bank::VariableExchange
   end
 
   def save_rates_to_s
-    open(ECB_RATES_URL).read
+    open(CACHED_RATES).read
   end
 
   def exchange(cents, from_currency, to_currency)
@@ -53,10 +53,10 @@ class EuCentralBank < Money::Bank::VariableExchange
   protected
 
   def doc(cache)
-    rates_source = !!cache ? cache : ECB_RATES_URL
+    rates_source = !!cache ? cache : CACHED_RATES
     Nokogiri::XML(open(rates_source)).tap {|doc| doc.xpath('gesmes:Envelope/xmlns:Cube/xmlns:Cube//xmlns:Cube') }
   rescue Nokogiri::XML::XPath::SyntaxError
-    Nokogiri::XML(open(ECB_RATES_URL))
+    Nokogiri::XML(open(CACHED_RATES))
   end
 
   def doc_from_s(content)
@@ -66,7 +66,7 @@ class EuCentralBank < Money::Bank::VariableExchange
   def update_parsed_rates(doc)
     rates = doc.xpath('gesmes:Envelope/xmlns:Cube/xmlns:Cube//xmlns:Cube')
 
-    @mutex.synchronize do 
+    @mutex.synchronize do
       rates.each do |exchange_rate|
         rate = BigDecimal(exchange_rate.attribute("rate").value)
         currency = exchange_rate.attribute("currency").value
