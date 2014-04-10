@@ -1,4 +1,5 @@
-require 'eu_central_bank'
+require 'offline_bank'
+require 'minitest'
 require 'shoulda'
 require 'rr'
 
